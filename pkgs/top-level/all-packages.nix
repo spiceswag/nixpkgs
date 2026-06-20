@@ -8832,6 +8832,8 @@ with pkgs;
     pname = "floorp-bin";
   };
 
+  zen-browser = callPackage ../applications/networking/browsers/zen { };
+
   inherit
     ({
       freeoffice = callPackage ../applications/office/softmaker/freeoffice.nix { };
