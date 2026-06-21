@@ -9,7 +9,7 @@ let
   artifacts = callPackage ./machbuild.nix { };
 in
 stdenv.mkDerivation (finalAttrs: {
-  pname = "zen-browser";
+  pname = "zen-browser-unwrapped";
   inherit (artifacts) version;
 
   meta = {

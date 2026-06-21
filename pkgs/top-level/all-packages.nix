@@ -8832,7 +8832,11 @@ with pkgs;
     pname = "floorp-bin";
   };
 
-  zen-browser = callPackage ../applications/networking/browsers/zen { };
+  zen-browser-unwrapped = callPackage ../applications/networking/browsers/zen { };
+
+  zen-browser = wrapFirefox zen-browser-unwrapped {
+    pname = "zen-browser";
+  };
 
   inherit
     ({
