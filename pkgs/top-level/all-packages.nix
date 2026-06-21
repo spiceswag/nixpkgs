@@ -8834,10 +8834,6 @@ with pkgs;
 
   zen-browser-unwrapped = callPackage ../applications/networking/browsers/zen { };
 
-  zen-browser = wrapFirefox zen-browser-unwrapped {
-    pname = "zen-browser";
-  };
-
   inherit
     ({
       freeoffice = callPackage ../applications/office/softmaker/freeoffice.nix { };
