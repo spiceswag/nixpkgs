@@ -13,6 +13,8 @@ let
 
   third = second.overrideAttrs (
     final: prev: {
+      ZEN_RELEASE = 1;
+
       prePatch = ''
         pushd ./engine
       '';
