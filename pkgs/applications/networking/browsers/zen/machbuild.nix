@@ -1,17 +1,34 @@
-{ buildMozillaMach, callPackage }:
+{
+  buildMozillaMach,
+  callPackage,
+  rustc,
+}:
 let
   worktree = callPackage ./prepare.nix { };
-
-  first = buildMozillaMach {
+in
+(
+  (buildMozillaMach {
     pname = "zen-browser-build";
     version = worktree.firefoxVersion;
     src = worktree;
+
     meta.maxSilent = 14400; # 4h, double the default of 7200s (c.f. #129212, #129115)
-  };
 
-  second = first.override { enableOfficialBranding = false; };
-
-  third = second.overrideAttrs (
+    # ZEN_RELEASE causes the use of a compiled clang plugin
+    extraNativeBuildInputs =
+      let
+        inherit (rustc) llvmPackages;
+      in
+      [
+        llvmPackages.libllvm
+        llvmPackages.libllvm.dev
+        llvmPackages.libclang
+        llvmPackages.libclang.dev
+      ];
+  }).override
+  { enableOfficialBranding = false; }
+).overrideAttrs
+  (
     final: prev: {
       ZEN_RELEASE = 1;
       SURFER_COMPAT =
@@ -38,6 +55,4 @@ let
       dontFixup = true;
       doInstallCheck = false;
     }
-  );
-in
-third
+  )
