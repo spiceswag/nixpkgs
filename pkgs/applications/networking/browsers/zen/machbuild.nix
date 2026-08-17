@@ -19,12 +19,7 @@ in
       let
         inherit (rustc) llvmPackages;
       in
-      [
-        llvmPackages.libllvm
-        llvmPackages.libllvm.dev
-        llvmPackages.libclang
-        llvmPackages.libclang.dev
-      ];
+      [ llvmPackages.libllvm ];
   }).override
   { enableOfficialBranding = false; }
 ).overrideAttrs
