@@ -20,7 +20,10 @@ lib.pipe
       let
         inherit (rustc) llvmPackages;
       in
-      [ llvmPackages.libllvm ];
+      [
+        llvmPackages.libllvm
+        llvmPackages.libclang.dev
+      ];
   }
   [
     buildMozillaMach
@@ -40,6 +43,11 @@ lib.pipe
               "aarch64"
             else
               "";
+
+          # Zen tries to include its own conflicting PGO parameters when ZEN_RELEASE is true
+          # inside of mozconfig (which has priority), so we disable these directives to use
+          # buildMozillaMach's options.
+          ZEN_GA_DISABLE_PGO = 1;
 
           prePatch = ''
             pushd ./engine
