@@ -1,13 +1,14 @@
 {
   buildMozillaMach,
   callPackage,
+  lib,
   rustc,
 }:
 let
   worktree = callPackage ./prepare.nix { };
 in
-(
-  (buildMozillaMach {
+lib.pipe
+  {
     pname = "zen-browser-build";
     version = worktree.firefoxVersion;
     src = worktree;
@@ -20,34 +21,39 @@ in
         inherit (rustc) llvmPackages;
       in
       [ llvmPackages.libllvm ];
-  }).override
-  { enableOfficialBranding = false; }
-).overrideAttrs
-  (
-    final: prev: {
-      ZEN_RELEASE = 1;
-      SURFER_COMPAT =
-        let
-          host = final.finalPackage.stdenv.hostPlatform;
-        in
-        if host.isLinux && host.isx86_64 then
-          "x86_64"
-        else if host.isLinux && host.isAarch64 then
-          "aarch64"
-        else
-          "";
+  }
+  [
+    buildMozillaMach
+    (pkg: pkg.override { enableOfficialBranding = false; })
+    (
+      pkg:
+      pkg.overrideAttrs (
+        final: prev: {
+          ZEN_RELEASE = 1;
+          SURFER_COMPAT =
+            let
+              host = final.finalPackage.stdenv.hostPlatform;
+            in
+            if host.isLinux && host.isx86_64 then
+              "x86_64"
+            else if host.isLinux && host.isAarch64 then
+              "aarch64"
+            else
+              "";
 
-      prePatch = ''
-        pushd ./engine
-      '';
+          prePatch = ''
+            pushd ./engine
+          '';
 
-      installPhase = ''
-        popd
-        mkdir -p $out
-        cp -rL . $out
-      '';
+          installPhase = ''
+            popd
+            mkdir -p $out
+            cp -rL . $out
+          '';
 
-      dontFixup = true;
-      doInstallCheck = false;
-    }
-  )
+          dontFixup = true;
+          doInstallCheck = false;
+        }
+      )
+    )
+  ]
