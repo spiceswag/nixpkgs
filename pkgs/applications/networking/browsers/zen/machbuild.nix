@@ -11,19 +11,18 @@ lib.pipe
   {
     pname = "zen-browser-build";
     version = worktree.firefoxVersion;
+
     src = worktree;
-
-    meta.maxSilent = 14400; # 4h, double the default of 7200s (c.f. #129212, #129115)
-
     # ZEN_RELEASE causes the use of a compiled clang plugin
+    extraPatches = [ ./03-mozconfig-disable-clang-plugin.patch ];
+
     extraNativeBuildInputs =
       let
         inherit (rustc) llvmPackages;
       in
-      [
-        llvmPackages.libllvm
-        llvmPackages.libclang.dev
-      ];
+      [ llvmPackages.libllvm ];
+
+    meta.maxSilent = 14400; # 4h, double the default of 7200s (c.f. #129212, #129115)
   }
   [
     buildMozillaMach

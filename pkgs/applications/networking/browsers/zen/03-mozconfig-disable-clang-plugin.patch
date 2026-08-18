@@ -1,0 +1,13 @@
+diff --git a/mozconfig b/mozconfig
+index 65829382b..4ce1fb0a2 100644
+--- a/mozconfig
++++ b/mozconfig
+@@ -54,7 +54,6 @@ fi
+ 
+ if test "$ZEN_RELEASE"; then
+ 
+-  ac_add_options --enable-clang-plugin
+   ac_add_options --enable-bootstrap=-sccache
+ 
+   ac_add_options --enable-optimize
+
