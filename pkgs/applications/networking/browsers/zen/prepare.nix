@@ -18,14 +18,14 @@
 }:
 buildNpmPackage (finalAttrs: {
   pname = "zen-browser-worktree";
-  version = "1.21.1b";
-  firefoxVersion = "151.0.4";
+  version = "1.22.2b";
+  firefoxVersion = "156.0";
 
   src = fetchFromGitHub {
     owner = "zen-browser";
     repo = "desktop";
     rev = finalAttrs.version;
-    hash = "sha256-MA0zjreQ8AwtFlGew25K3WMlNqcmTpqrp2smX6t4Jkk=";
+    hash = "sha256-dpEbZ6Jv54LDvK5cx4+zPJexTq+7xLvfu9UJkiIs0eM=";
   };
 
   patches = [
@@ -56,7 +56,7 @@ buildNpmPackage (finalAttrs: {
   npmDepsFetcherVersion = finalAttrs.npmDeps.fetcherVersion;
   npmDeps = fetchNpmDeps {
     name = "zen-npm-deps";
-    hash = "sha256-HC8yz/nJZSZbulYYrMIOX+aOtJdles2rixEJvtKSXwU=";
+    hash = "sha256-gDxwN00tJieDiMCobtB73BzwMhsgKPSeutF1Ek29Xo8=";
     fetcherVersion = 2;
     src = applyPatches { inherit (finalAttrs) src patches; };
   };
@@ -64,7 +64,7 @@ buildNpmPackage (finalAttrs: {
   firefox = fetchzip {
     name = "firefox-source";
     url = "mirror://mozilla/firefox/releases/${finalAttrs.firefoxVersion}/source/firefox-${finalAttrs.firefoxVersion}.source.tar.xz";
-    hash = "sha256-YWyEl0uISfRRRVBegpN6kviR6CPMzkow0sck4gTyK0Q=";
+    hash = "sha256-LP38+BKVZ0b2udMlHbjcz0z5qeM3J04qfDWiGygxWoE=";
   };
 
   SHARP_FORCE_GLOBAL_LIBVIPS = "1";

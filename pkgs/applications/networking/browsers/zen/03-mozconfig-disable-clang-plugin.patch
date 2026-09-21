@@ -1,13 +1,15 @@
-diff --git a/mozconfig b/mozconfig
-index 65829382b..4ce1fb0a2 100644
+diff --git a/./mozconfig.bak b/./mozconfig
+index 3378121..d167b40 100644
 --- a/mozconfig
 +++ b/mozconfig
-@@ -54,7 +54,6 @@ fi
+@@ -52,9 +52,7 @@ if test -f "$HOME/.zen-keys/google_location_service.dat"; then
+   ac_add_options --with-google-location-service-api-keyfile="$HOME/.zen-keys/google_location_service.dat"
+ fi
  
- if test "$ZEN_RELEASE"; then
- 
+-if test "$ZEN_RELEASE"; then
+-
 -  ac_add_options --enable-clang-plugin
-   ac_add_options --enable-bootstrap=-sccache
- 
-   ac_add_options --enable-optimize
-
++if test "$ZEN_RELEASE"; then  
+   
+   if ! test "$ZEN_DISABLE_BOOTSTRAP"; then
+     ac_add_options --enable-bootstrap=-sccache
