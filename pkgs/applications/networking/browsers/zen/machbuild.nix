@@ -3,6 +3,7 @@
   callPackage,
   lib,
   rustc,
+  git,
 }:
 let
   worktree = callPackage ./prepare.nix { };
@@ -16,11 +17,23 @@ lib.pipe
     # ZEN_RELEASE causes the use of a compiled clang plugin
     extraPatches = [ ./03-mozconfig-disable-clang-plugin.patch ];
 
+    # bullet point number 2 @
+    # https://firefox-source-docs.mozilla.org/build/buildsystem/python.html#deficiencies
+    extraPostPatch = ''
+      # Set predictable directories for build and state
+      export MOZ_OBJDIR=$(pwd)/objdir
+      export MOZBUILD_STATE_PATH=$TMPDIR/mozbuild
+      ./mach clobber
+    '';
+
     extraNativeBuildInputs =
       let
         inherit (rustc) llvmPackages;
       in
-      [ llvmPackages.libllvm ];
+      [
+        llvmPackages.libllvm
+        git
+      ];
 
     meta.maxSilent = 14400; # 4h, double the default of 7200s (c.f. #129212, #129115)
   }
