@@ -1,40 +1,240 @@
 {
+  applyPatches,
+  buildMozillaMach,
   callPackage,
+  fetchFromGitHub,
+  fetchNpmDeps,
+  fetchzip,
+  git,
+  glib,
+  jq,
   lib,
   nodejs_22,
+  npmHooks,
   python3,
+  python313Packages,
+  # rustc,
+  sccache,
   stdenv,
+  vips,
 }:
 let
-  artifacts = callPackage ./machbuild.nix { };
+  options = lib.fix (self: {
+    mach.pname = "zen-browser";
+    # Zen version
+    mach.packageVersion = "1.22.2b";
+    # Firefox version
+    mach.version = "156.0";
+    drv.firefoxVersion = self.mach.version;
+
+    mach.meta = {
+      description = "Beautifully designed, privacy-focused browser, packed with features.";
+      homepage = "https://zen-browser.app/";
+      license = lib.licenses.mpl20;
+      maxSilent = 14400; # 4h, double the default of 7200s (c.f. #129212, #129115)
+    };
+
+    mach.src = fetchFromGitHub {
+      owner = "zen-browser";
+      repo = "desktop";
+      rev = self.mach.packageVersion;
+      hash = "sha256-dpEbZ6Jv54LDvK5cx4+zPJexTq+7xLvfu9UJkiIs0eM=";
+    };
+    drv.firefox = fetchzip {
+      name = "firefox-source";
+      url = "mirror://mozilla/firefox/releases/${self.mach.version}/source/firefox-${self.mach.version}.source.tar.xz";
+      hash = "sha256-LP38+BKVZ0b2udMlHbjcz0z5qeM3J04qfDWiGygxWoE=";
+    };
+
+    drv.zenPatches = [
+      ./01-sharp-bump.patch
+      ./02-sharp-node-gyp.patch
+    ];
+
+    drv.npmDeps = fetchNpmDeps {
+      name = "zen-npm-deps";
+      hash = "sha256-gDxwN00tJieDiMCobtB73BzwMhsgKPSeutF1Ek29Xo8=";
+      fetcherVersion = 2;
+      src = applyPatches {
+        inherit (self.mach) src;
+        patches = self.drv.zenPatches;
+      };
+    };
+
+    mach.extraNativeBuildInputs = [
+      (callPackage ./ffprefs.nix {
+        version = self.mach.packageVersion;
+        inherit (self.mach) src;
+      })
+      git
+      glib.dev
+      jq
+      nodejs_22
+      npmHooks.npmConfigHook
+      python3
+      python313Packages.rtoml
+      python313Packages.orjson
+      python313Packages.zstandard
+      python313Packages.pyyaml
+      sccache
+      vips.dev
+      # rustc.llvmPackages.libllvm
+    ];
+
+    drv.phases = lib.strings.replaceString "\n" " " ''
+      ''${prePhases[*]:-} unpackPhase zenPatchPhase npmConfigHook zenPreparePhase zenApplyPhase
+      patchPhase ''${preConfigurePhases[*]:-} configurePhase
+      ''${preBuildPhases[*]:-} buildPhase checkPhase ''${preInstallPhases[*]:-} installPhase
+      fixupPhase installCheckPhase ''${preDistPhases[*]:-} distPhase ''${postPhases[*]:-}
+    '';
+
+    # run a preliminary patch phase for zen itself
+    drv.zenPatchPhase = ''
+      # ignore npmConfigHook (lmao)
+      unset postPatchHooks
+
+      # stash patchPhase variables
+      local stashPrePatch="''${prePatch:-}"
+      unset prePatch
+      local stashPrePatchHooks="''${prePatchHooks[*]:-}"
+      unset prePatchHooks
+      local stashPatches="''${patches[*]:-}"
+      unset patches
+      local stashPatchFlags="''${patchFlags[*]:-}"
+      unset patchFlags
+      local stashPostPatch="''${postPatch:-}"
+      unset postPatch
+      # apply zen specific patches
+      patches="''${zenPatches[*]:-}"
+      runPhase "patchPhase"
+      unset patches
+      # restore patchPhase variables
+      prePatch="''${stashPrePatch:-}"
+      prePatchHooks="''${stashPrePatchHooks[*]:-}"
+      patches="''${stashPatches[*]:-}"
+      patchFlags="''${stashPatchFlags[*]:-}"
+      postPatch="''${stashPostPatch:-}"
+    '';
+
+    # npmConfigHook
+
+    drv.preZenPrepare = ''
+      actualVersion=$(cat "./surfer.json" | jq --raw-output ".version.version")
+      if [ "$firefoxVersion" != "$actualVersion" ]; then
+        echo
+        echo FATAL: You have not provided the correct version of the firefox sources
+        echo Expected firefox version $actualVersion
+        echo Found firefox sources $firefoxVersion
+        echo
+        exit 1
+      fi
+    '';
+
+    drv.zenPreparePhase = ''
+      runHook "preZenPrepare"
+
+      # npm run init
+      echo "Using pre-downloaded firefox sources"
+      cp -r $firefox ./engine
+      echo "Making firefox sources writable"
+      chmod --recursive +w ./engine
+      # https://github.com/zen-browser/surfer/blob/main/src/commands/init.ts
+      pushd ./engine
+      git init --initial-branch $firefoxVersion
+
+      git config user.name "nixbld"
+      git config user.email "nixbld@example.com"
+
+      git add -f .
+      git config commit.gpgsign false
+      git config core.safecrlf false
+
+      echo "Commiting engine tree to git"
+      git commit -aqm "Firefox $firefoxVersion"
+
+      echo "Done commiting to git"
+      git checkout -b "zen_browser"
+      popd
+
+      ## npm run import
+      ffprefs .
+      npm run import:dumps
+      npx -- surfer import
+    '';
+
+    drv.SHARP_FORCE_GLOBAL_LIBVIPS = "1";
+    drv.PKG_CONFIG_PATH = "$PKG_CONFIG_PATH:${
+      lib.makeSearchPath "lib/pkgconfig" [
+        vips.dev
+        glib.dev
+      ]
+    }";
+
+    drv.ZEN_RELEASE = 1;
+
+    drv.zenApplyPhase = ''
+      # equivalent to npm run bootstrap, which doesn't change cwd correctly
+      patchShebangs --build ./engine/mach ./engine/build
+
+      git init --initial-branch main
+      git add .
+      git config user.name "nixbld"
+      git config user.email "nixbld@example.com"
+      git commit -qm "Zen Browser $version"
+
+      SURFER_MOZCONFIG_ONLY=1 npm run build
+    '';
+
+    drv.prePatch = ''
+      pushd ./engine
+    '';
+
+    # ZEN_RELEASE causes the use of a compiled clang plugin
+    # TODO(spiceswag): replace this with an extraPostPatch script that removes the line dynamically
+    #                  instead of regenerating the patch manually on every version bump
+    mach.extraPatches = [ ./03-mozconfig-disable-clang-plugin.patch ];
+
+    # patchPhase
+
+    drv.SURFER_PLATFORM =
+      let
+        host = stdenv.hostPlatform;
+      in
+      if host.isLinux then "linux" else ""; # TODO
+    drv.SURFER_COMPAT =
+      let
+        host = stdenv.hostPlatform;
+      in
+      if host.isx86_64 then
+        "x86_64"
+      else if host.isAarch64 then
+        "aarch64"
+      else
+        "";
+    # Zen tries to include its own conflicting PGO parameters when ZEN_RELEASE is true
+    # inside of mozconfig (which has priority), so we disable these directives to use
+    # buildMozillaMach's options.
+    drv.ZEN_GA_DISABLE_PGO = 1;
+
+    # This might override zen branding otherwise
+    extra.enableOfficialBranding = false;
+
+    # preConfigurePhases
+    # configurePhase
+    # buildPhase
+
+    drv.preInstallPhases = "zenPackagePhase";
+
+    drv.zenPackagePhase = ''
+      popd
+      npm run package
+    '';
+
+    # installPhase (make install)
+    # fixupPhase
+    # installCheckPhase
+
+    # TODO: mach.binaryName, mach.applicationName, etc. for correct buildMozillaMach preInstall
+  });
 in
-stdenv.mkDerivation (finalAttrs: {
-  pname = "zen-browser-unwrapped";
-  inherit (artifacts) version;
-
-  meta = {
-    description = "Beautifully designed, privacy-focused browser, packed with features.";
-    homepage = "https://zen-browser.app/";
-    license = lib.licenses.mpl20;
-  };
-
-  src = artifacts;
-
-  ZEN_RELEASE = 1;
-  SURFER_PLATFORM = "linux";
-
-  nativeBuildInputs = [
-    nodejs_22
-    python3
-  ];
-
-  buildPhase = ''
-    npm run package
-  '';
-
-  installPhase = ''
-    mkdir -p $out
-    cd ./engine
-    make install
-  '';
-})
+((buildMozillaMach options.mach).override options.extra).overrideAttrs options.drv

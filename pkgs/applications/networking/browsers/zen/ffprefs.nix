@@ -1,11 +1,12 @@
 {
   lib,
   rustPlatform,
-  zen,
+  version,
+  src,
 }:
 rustPlatform.buildRustPackage (final: {
   pname = "zen-ffprefs";
-  inherit (zen) version src;
+  inherit version src;
   sourceRoot = "${final.src.name}/tools/ffprefs";
 
   cargoHash = "sha256-DZMwxeulQiIiSATU0MoyqiUMA0USZq6umhkr67hZH1Q=";
