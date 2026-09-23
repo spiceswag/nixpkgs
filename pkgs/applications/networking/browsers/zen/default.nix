@@ -81,39 +81,54 @@ let
       # rustc.llvmPackages.libllvm
     ];
 
-    drv.phases = lib.strings.replaceString "\n" " " ''
-      ''${prePhases[*]:-} unpackPhase zenPatchPhase npmConfigHook zenPreparePhase zenApplyPhase
-      patchPhase ''${preConfigurePhases[*]:-} configurePhase
-      ''${preBuildPhases[*]:-} buildPhase checkPhase ''${preInstallPhases[*]:-} installPhase
-      fixupPhase installCheckPhase ''${preDistPhases[*]:-} distPhase ''${postPhases[*]:-}
+    drv.postHook = ''
+      phases="${
+        lib.strings.replaceString "\n" " " ''
+          ''${prePhases[*]:-} unpackPhase zenPatchPhase npmConfigHook zenPreparePhase zenApplyPhase
+          patchPhase ''${preConfigurePhases[*]:-} configurePhase
+          ''${preBuildPhases[*]:-} buildPhase checkPhase ''${preInstallPhases[*]:-} installPhase
+          fixupPhase installCheckPhase ''${preDistPhases[*]:-} distPhase ''${postPhases[*]:-}
+        ''
+      }"
     '';
 
     # run a preliminary patch phase for zen itself
     drv.zenPatchPhase = ''
-      # ignore npmConfigHook (lmao)
+      # ignore npmConfigHook to explicitly order it
       unset postPatchHooks
 
-      # stash patchPhase variables
-      local stashPrePatch="''${prePatch:-}"
-      unset prePatch
-      local stashPrePatchHooks="''${prePatchHooks[*]:-}"
-      unset prePatchHooks
-      local stashPatches="''${patches[*]:-}"
-      unset patches
-      local stashPatchFlags="''${patchFlags[*]:-}"
-      unset patchFlags
-      local stashPostPatch="''${postPatch:-}"
-      unset postPatch
-      # apply zen specific patches
-      patches="''${zenPatches[*]:-}"
-      runPhase "patchPhase"
-      unset patches
-      # restore patchPhase variables
-      prePatch="''${stashPrePatch:-}"
-      prePatchHooks="''${stashPrePatchHooks[*]:-}"
-      patches="''${stashPatches[*]:-}"
-      patchFlags="''${stashPatchFlags[*]:-}"
-      postPatch="''${stashPostPatch:-}"
+      runHook preZenPatch
+
+      local -a patchesArray
+      concatTo patchesArray zenPatches
+
+      local -a flagsArray
+      concatTo flagsArray zenPatchFlags=-p1
+
+      for i in "''${patchesArray[@]}"; do
+          echo "applying patch $i"
+          local uncompress=cat
+          case "$i" in
+              *.gz)
+                  uncompress="gzip -d"
+                  ;;
+              *.bz2)
+                  uncompress="bzip2 -d"
+                  ;;
+              *.xz)
+                  uncompress="xz -d"
+                  ;;
+              *.lzma)
+                  uncompress="lzma -d"
+                  ;;
+          esac
+
+          # "2>&1" is a hack to make patch fail if the decompressor fails (nonexistent patch, etc.)
+          # shellcheck disable=SC2086
+          $uncompress < "$i" 2>&1 | patch "''${flagsArray[@]}"
+      done
+
+      runHook postZenPatch
     '';
 
     # npmConfigHook
@@ -212,8 +227,8 @@ let
       else
         "";
     # Zen tries to include its own conflicting PGO parameters when ZEN_RELEASE is true
-    # inside of mozconfig (which has priority), so we disable these directives to use
-    # buildMozillaMach's options.
+    # inside of mozconfig (which has priority because it is evaluated later),
+    # so we disable these directives to use buildMozillaMach's options.
     drv.ZEN_GA_DISABLE_PGO = 1;
 
     # This might override zen branding otherwise
@@ -223,18 +238,20 @@ let
     # configurePhase
     # buildPhase
 
-    drv.preInstallPhases = "zenPackagePhase";
+    # I think this works without npm package
+    # drv.preInstallPhases = "zenPackagePhase";
+    # drv.zenPackagePhase = ''
+    #   popd
+    #   npm run package
+    # '';
 
-    drv.zenPackagePhase = ''
-      popd
-      npm run package
-    '';
+    mach.binaryName = "zen";
+    # FIXME: check if this option is correct on darwin
+    mach.applicationName = "Zen";
 
     # installPhase (make install)
     # fixupPhase
     # installCheckPhase
-
-    # TODO: mach.binaryName, mach.applicationName, etc. for correct buildMozillaMach preInstall
   });
 in
 ((buildMozillaMach options.mach).override options.extra).overrideAttrs options.drv
