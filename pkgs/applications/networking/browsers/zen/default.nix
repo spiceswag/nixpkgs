@@ -15,13 +15,13 @@
   vips,
 }:
 let
-  options = lib.fix (self: {
+  options = final: {
     mach.pname = "zen-browser";
     # Zen version
     mach.packageVersion = "1.22.2b";
     # Firefox version
     mach.version = "156.0";
-    drv.firefoxVersion = self.mach.version;
+    drv.firefoxVersion = final.mach.version;
 
     mach.meta = {
       description = "Beautifully designed, privacy-focused browser, packed with features.";
@@ -33,12 +33,12 @@ let
     mach.src = fetchFromGitHub {
       owner = "zen-browser";
       repo = "desktop";
-      rev = self.mach.packageVersion;
+      rev = final.mach.packageVersion;
       hash = "sha256-dpEbZ6Jv54LDvK5cx4+zPJexTq+7xLvfu9UJkiIs0eM=";
     };
     drv.firefox = fetchzip {
       name = "firefox-source";
-      url = "mirror://mozilla/firefox/releases/${self.mach.version}/source/firefox-${self.mach.version}.source.tar.xz";
+      url = "mirror://mozilla/firefox/releases/${final.mach.version}/source/firefox-${final.mach.version}.source.tar.xz";
       hash = "sha256-LP38+BKVZ0b2udMlHbjcz0z5qeM3J04qfDWiGygxWoE=";
     };
 
@@ -52,15 +52,15 @@ let
       hash = "sha256-gDxwN00tJieDiMCobtB73BzwMhsgKPSeutF1Ek29Xo8=";
       fetcherVersion = 2;
       src = applyPatches {
-        inherit (self.mach) src;
-        patches = self.drv.zenPatches;
+        inherit (final.mach) src;
+        patches = final.drv.zenPatches;
       };
     };
 
     mach.extraNativeBuildInputs = [
       (callPackage ./ffprefs.nix {
-        version = self.mach.packageVersion;
-        inherit (self.mach) src;
+        version = final.mach.packageVersion;
+        inherit (final.mach) src;
       })
       git
       glib.dev
@@ -241,6 +241,8 @@ let
     # installPhase (make install)
     # fixupPhase
     # installCheckPhase
-  });
+  };
 in
-((buildMozillaMach options.mach).override options.extra).overrideAttrs options.drv
+lib.makeOverridable (
+  resolved: ((buildMozillaMach resolved.mach).override resolved.extra).overrideAttrs resolved.drv
+) (lib.fix options)
