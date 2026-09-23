@@ -11,10 +11,6 @@
   lib,
   nodejs_22,
   npmHooks,
-  python3,
-  python313Packages,
-  # rustc,
-  sccache,
   stdenv,
   vips,
 }:
@@ -71,14 +67,7 @@ let
       jq
       nodejs_22
       npmHooks.npmConfigHook
-      python3
-      python313Packages.rtoml
-      python313Packages.orjson
-      python313Packages.zstandard
-      python313Packages.pyyaml
-      sccache
       vips.dev
-      # rustc.llvmPackages.libllvm
     ];
 
     drv.postHook = ''
