@@ -25,7 +25,7 @@ let
     fi
   '';
 
-  options = final: {
+  options = lib.fix (final: {
     mach.pname = "zen-browser";
     # Zen version
     mach.packageVersion = "1.22.2b";
@@ -37,6 +37,7 @@ let
       description = "Beautifully designed, privacy-focused browser, packed with features.";
       homepage = "https://zen-browser.app/";
       license = lib.licenses.mpl20;
+      mainProgram = "zen";
       maxSilent = 14400; # 4h, double the default of 7200s (c.f. #129212, #129115)
     };
 
@@ -238,8 +239,6 @@ let
     # installPhase (make install)
     # fixupPhase
     # installCheckPhase
-  };
+  });
 in
-lib.makeOverridable (
-  resolved: ((buildMozillaMach resolved.mach).override resolved.extra).overrideAttrs resolved.drv
-) (lib.fix options)
+((buildMozillaMach options.mach).override options.extra).overrideAttrs options.drv
