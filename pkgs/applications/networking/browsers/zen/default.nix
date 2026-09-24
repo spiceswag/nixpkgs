@@ -13,8 +13,18 @@
   npmHooks,
   stdenv,
   vips,
+  writeShellScriptBin,
 }:
 let
+  fakeGit = writeShellScriptBin "git" ''
+    if [ "$1" = "rev-parse" ] && [ "$2" = "HEAD" ]; then
+      cat .commit
+    else
+      echo "Unsupported command: fake-git only supports printing the HEAD rev" 1>&2
+      exit 1
+    fi
+  '';
+
   options = final: {
     mach.pname = "zen-browser";
     # Zen version
@@ -34,7 +44,14 @@ let
       owner = "zen-browser";
       repo = "desktop";
       rev = final.mach.packageVersion;
-      hash = "sha256-dpEbZ6Jv54LDvK5cx4+zPJexTq+7xLvfu9UJkiIs0eM=";
+      hash = "sha256-PtEHhuzSQCKm1ZqzARHM+hJHDLJITBdY1ll9ynJdH/4=";
+      # leave information required for zen to link to the correct changelog
+      leaveDotGit = true;
+      postFetch = ''
+        cd $out
+        ${git}/bin/git rev-parse HEAD > .commit
+        rm -r ./.git
+      '';
     };
     drv.firefox = fetchzip {
       name = "firefox-source";
@@ -142,23 +159,6 @@ let
       cp -r $firefox ./engine
       echo "Making firefox sources writable"
       chmod --recursive +w ./engine
-      # https://github.com/zen-browser/surfer/blob/main/src/commands/init.ts
-      pushd ./engine
-      git init --initial-branch $firefoxVersion
-
-      git config user.name "nixbld"
-      git config user.email "nixbld@example.com"
-
-      git add -f .
-      git config commit.gpgsign false
-      git config core.safecrlf false
-
-      echo "Commiting engine tree to git"
-      git commit -aqm "Firefox $firefoxVersion"
-
-      echo "Done commiting to git"
-      git checkout -b "zen_browser"
-      popd
 
       ## npm run import
       ffprefs .
@@ -177,17 +177,8 @@ let
     drv.ZEN_RELEASE = 1;
 
     drv.zenApplyPhase = ''
-      # equivalent to npm run bootstrap, which doesn't change cwd correctly
-      patchShebangs --build ./engine/mach ./engine/build
-
-      # FIXME: this breaks changelogs
-      git init --initial-branch main
-      git add .
-      git config user.name "nixbld"
-      git config user.email "nixbld@example.com"
-      git commit -qm "Zen Browser $version"
-
-      SURFER_MOZCONFIG_ONLY=1 npm run build
+      # This is where the git hack is used
+      PATH="${fakeGit}/bin:$PATH" SURFER_MOZCONFIG_ONLY=1 npm run build
     '';
 
     drv.prePatch = ''
@@ -210,7 +201,7 @@ let
       else if host.isDarwin then
         "darwin"
       else
-        ""; # TODO
+        "";
     drv.SURFER_COMPAT =
       let
         host = stdenv.hostPlatform;
