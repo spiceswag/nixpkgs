@@ -16,12 +16,11 @@
   writeShellScriptBin,
 }:
 let
-  fakeGit = writeShellScriptBin "git" ''
+  gitWrapped = writeShellScriptBin "git" ''
     if [ "$1" = "rev-parse" ] && [ "$2" = "HEAD" ]; then
       cat .commit
     else
-      echo "Unsupported command: fake-git only supports printing the HEAD rev" 1>&2
-      exit 1
+      exec ${git}/bin/git "$@"
     fi
   '';
 
@@ -80,7 +79,7 @@ let
         version = final.mach.packageVersion;
         inherit (final.mach) src;
       })
-      git
+      gitWrapped
       glib.dev
       jq
       nodejs_22
@@ -178,8 +177,10 @@ let
     drv.ZEN_RELEASE = 1;
 
     drv.zenApplyPhase = ''
-      # This is where the git hack is used
-      PATH="${fakeGit}/bin:$PATH" SURFER_MOZCONFIG_ONLY=1 npm run build
+      # gitWrapper is used in this command to embed the zen-browser source rev
+      # into the built application, as is needed for proper changelogs, without
+      # needing a full source code checkout with .git
+      SURFER_MOZCONFIG_ONLY=1 npm run build
     '';
 
     drv.prePatch = ''
