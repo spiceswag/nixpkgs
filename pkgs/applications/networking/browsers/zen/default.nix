@@ -73,7 +73,7 @@ let
     drv.postHook = ''
       phases="${
         lib.strings.replaceString "\n" " " ''
-          ''${prePhases[*]:-} unpackPhase zenPatchPhase npmConfigHook zenPreparePhase zenApplyPhase
+          ''${prePhases[*]:-} unpackPhase zenPatchPhase npmConfigHook zenImportPhase zenApplyPhase
           patchPhase ''${preConfigurePhases[*]:-} configurePhase
           ''${preBuildPhases[*]:-} buildPhase checkPhase ''${preInstallPhases[*]:-} installPhase
           fixupPhase installCheckPhase ''${preDistPhases[*]:-} distPhase ''${postPhases[*]:-}
@@ -122,7 +122,7 @@ let
 
     # npmConfigHook
 
-    drv.preZenPrepare = ''
+    drv.preZenImport = ''
       actualVersion=$(cat "./surfer.json" | jq --raw-output ".version.version")
       if [ "$firefoxVersion" != "$actualVersion" ]; then
         echo
@@ -134,8 +134,8 @@ let
       fi
     '';
 
-    drv.zenPreparePhase = ''
-      runHook "preZenPrepare"
+    drv.zenImportPhase = ''
+      runHook "preZenImport"
 
       # npm run init
       echo "Using pre-downloaded firefox sources"
@@ -180,6 +180,7 @@ let
       # equivalent to npm run bootstrap, which doesn't change cwd correctly
       patchShebangs --build ./engine/mach ./engine/build
 
+      # FIXME: this breaks changelogs
       git init --initial-branch main
       git add .
       git config user.name "nixbld"
@@ -204,7 +205,12 @@ let
       let
         host = stdenv.hostPlatform;
       in
-      if host.isLinux then "linux" else ""; # TODO
+      if host.isLinux then
+        "linux"
+      else if host.isDarwin then
+        "darwin"
+      else
+        ""; # TODO
     drv.SURFER_COMPAT =
       let
         host = stdenv.hostPlatform;
