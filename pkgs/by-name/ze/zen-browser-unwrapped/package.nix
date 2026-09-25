@@ -11,7 +11,6 @@
   lib,
   nodejs_22,
   npmHooks,
-  stdenv,
   vips,
   writeShellScriptBin,
 }:
@@ -174,53 +173,41 @@ let
       ]
     }";
 
-    drv.ZEN_RELEASE = 1;
-
     drv.zenApplyPhase = ''
       # gitWrapper is used in this command to embed the zen-browser source rev
       # into the built application, as is needed for proper changelogs, without
       # needing a full source code checkout with .git
       SURFER_MOZCONFIG_ONLY=1 npm run build
-    '';
-
-    drv.prePatch = ''
       pushd ./engine
+      # the existence of mozconfig breaks `mach clobber`, probably needs a patch in buildMozillaMach to work
+      rm ./mozconfig
     '';
-
-    # ZEN_RELEASE causes the use of a compiled clang plugin
-    # TODO(spiceswag): replace this with an extraPostPatch script that removes the line dynamically
-    #                  instead of regenerating the patch manually on every version bump
-    mach.extraPatches = [ ./03-mozconfig-disable-clang-plugin.patch ];
 
     # patchPhase
 
-    drv.SURFER_PLATFORM =
-      let
-        host = stdenv.hostPlatform;
-      in
-      if host.isLinux then
-        "linux"
-      else if host.isDarwin then
-        "darwin"
-      else
-        "";
-    drv.SURFER_COMPAT =
-      let
-        host = stdenv.hostPlatform;
-      in
-      if host.isx86_64 then
-        "x86_64"
-      else if host.isAarch64 then
-        "aarch64"
-      else
-        "";
-    # Zen tries to include its own conflicting PGO parameters when ZEN_RELEASE is true
-    # inside of mozconfig (which has priority because it is evaluated later),
-    # so we disable these directives to use buildMozillaMach's options.
-    drv.ZEN_GA_DISABLE_PGO = 1;
+    # Manually set options used in mozconfig
+    drv.MOZ_APP_BASENAME = "Zen";
+    mach.branding = "browser/branding/unofficial";
+    drv.MOZ_BRANDING_DIRECTORY = "browser/branding/unofficial";
+    drv.MOZ_OFFICIAL_BRANDING_DIRECTORY = "browser/branding/unofficial";
+    drv.ZEN_FIREFOX_VERSION = final.mach.version;
 
-    # This might override zen branding otherwise
-    extra.enableOfficialBranding = false;
+    mach.extraConfigureFlags = [
+      "--with-app-basename=Zen"
+      # upstream's options
+      "--with-unsigned-addon-scopes=app,system"
+      "--enable-jxl"
+    ];
+
+    drv.MOZ_SOURCE_REPO = "https://github.com/zen-browser/desktop";
+    drv.MOZ_INCLUDE_SOURCE_INFO = 1;
+    mach.extraPreConfigure = ''
+      export MOZ_SOURCE_CHANGESET=$(cat ../.commit)
+      configureFlagsArray+=(
+        # Localization (Must be an absolute path)
+        --with-l10n-base="$(realpath .)/browser/locales"
+      )
+    '';
 
     # preConfigurePhases
     # configurePhase
@@ -242,4 +229,4 @@ let
     # installCheckPhase
   });
 in
-((buildMozillaMach options.mach).override options.extra).overrideAttrs options.drv
+(buildMozillaMach options.mach).overrideAttrs options.drv
