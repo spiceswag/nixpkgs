@@ -26,9 +26,9 @@ let
   options = lib.fix (final: {
     mach.pname = "zen-browser";
     # Zen version
-    mach.packageVersion = "1.22.2b";
+    mach.packageVersion = "1.22.3b";
     # Firefox version
-    mach.version = "156.0";
+    mach.version = "156.0.1";
     drv.firefoxVersion = final.mach.version;
 
     mach.meta = {
@@ -43,7 +43,7 @@ let
       owner = "zen-browser";
       repo = "desktop";
       rev = final.mach.packageVersion;
-      hash = "sha256-PtEHhuzSQCKm1ZqzARHM+hJHDLJITBdY1ll9ynJdH/4=";
+      hash = "sha256-P0f8pddrtRMH1Ez14XkaHLNpjY9EXKn4icop3npFYfE=";
       # leave information required for zen to link to the correct changelog
       leaveDotGit = true;
       postFetch = ''
@@ -55,7 +55,7 @@ let
     drv.firefox = fetchzip {
       name = "firefox-source";
       url = "mirror://mozilla/firefox/releases/${final.mach.version}/source/firefox-${final.mach.version}.source.tar.xz";
-      hash = "sha256-LP38+BKVZ0b2udMlHbjcz0z5qeM3J04qfDWiGygxWoE=";
+      hash = "sha256-cWbXbXfw/eR91I87+rycLea9voLZj92v0i6TeFMgNs0=";
     };
 
     drv.zenPatches = [
